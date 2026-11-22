@@ -1,0 +1,64 @@
+{
+  "measures": [
+    {
+      "id": "m1",
+      "numerator": 4,
+      "denominator": 4
+    },
+    {
+      "id": "m2",
+      "numerator": 4,
+      "denominator": 4
+    }
+  ],
+  "events": [
+    {
+      "id": "n1",
+      "voice": "v1",
+      "measure": "m1",
+      "start": [
+        0,
+        1
+      ],
+      "duration": [
+        4,
+        1
+      ],
+      "pitches": [
+        60
+      ],
+      "tie_to": "n2"
+    },
+    {
+      "id": "n2",
+      "voice": "v1",
+      "measure": "m2",
+      "start": [
+        0,
+        1
+      ],
+      "duration": [
+        2,
+        1
+      ],
+      "pitches": [
+        60
+      ]
+    },
+    {
+      "id": "r1",
+      "voice": "v1",
+      "measure": "m2",
+      "start": [
+        2,
+        1
+      ],
+      "duration": [
+        2,
+        1
+      ],
+      "pitches": []
+    }
+  ],
+  "transpose": 2
+}
