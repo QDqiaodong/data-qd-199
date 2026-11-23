@@ -39,6 +39,33 @@ from score_spans.service import process_window
 result = process_window(score, sections, first, stop)
 ```
 
+## 语料发布：train/eval 数据集
+
+`score_spans.corpus` 在旧入口之外提供本地语料发布接口，供数据管道把
+补录、更正和撤回整理成可复现、防串集的两份数据集与隔离清单：
+
+```python
+from score_spans.corpus import publish_corpus, read_corpus
+release = publish_corpus(store, request_id, expected_release, changes)
+current = read_corpus(store)      # 默认当前版本
+old = read_corpus(store, 1)       # 按编号原样读回历史版本
+```
+
+* 批次 1..100 项 `upsert`/`withdraw`，共同生效；`score` 沿用现有源谱
+  结构检查，训练准入新增越界、同声部重叠、未兑现延音、无发音跨度
+  四项拒绝（缺拍允许），任何一项失败拒绝整批。
+* 样本取源谱顺序的发音跨度（合法延音合并、移调后音高），端点为规范
+  精确分数字符串；内容指纹对整体平移、改名、等效延音写法不敏感，
+  对节奏、相对音程、重复跨度数目和谱尾留白敏感。
+* 共享曲族或内容指纹连成关系组；曾发布到某侧的 ID 留下历史锚点，
+  组内两侧锚点同时出现时整组只进隔离清单，单侧锚点优先于新谱的
+  分集建议。
+* 版本递增、历史版本原样可读；同一 `request_id` 原样重试返回原版本，
+  改参数报冲突；发布经原子改名一次生效，并发提交至多一个成功。
+
+入库规则、关系证据与锚点、返回字段、重试顺序、错误类型、崩溃语义见
+[语料发布契约](docs/corpus.md)。
+
 ## 运行测试
 
 在本仓根目录（已安装本包或设置 `PYTHONPATH=src`）：
@@ -47,7 +74,7 @@ result = process_window(score, sections, first, stop)
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-测试包含旧接口回归、窗口链裁剪、段/轮次/跨段边界、覆盖审核与 `invalid_tie` 的 ordinal、非法参数拒绝，以及 10^9 次反复的冷启动计时用例。
+测试包含旧接口回归、窗口链裁剪、段/轮次/跨段边界、覆盖审核与 `invalid_tie` 的 ordinal、非法参数拒绝，以及 10^9 次反复的冷启动计时用例；`tests/test_corpus.py` 另覆盖语料发布的桥接隔离、历史锚点、历史版本读取、等效指纹与区分边界、进程中断恢复、同版本并发写入、不合规批次整批拒绝与错误类别区分。
 
 演示标准输出摘要：
 

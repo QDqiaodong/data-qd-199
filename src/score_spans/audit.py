@@ -16,7 +16,8 @@ def audit_measures(measures,events):
             if cursor<m['length']:diagnostics.append({'kind':'gap','voice':voice,'measure':m['id'],'start':str(cursor),'end':str(m['length'])})
     return diagnostics
 
-def spans(events):
+def chains(events):
+    """合法延音合并后的发音链，端点保留精确 Fraction（供语料指纹使用）。"""
     by_id={e['id']:e for e in events};valid={};diagnostics=[]
     for e in events:
         if e['tie_to'] is None:continue
@@ -30,5 +31,9 @@ def spans(events):
         chain=[e['id']];last=e
         while last['id'] in valid:
             last=by_id[valid[last['id']]];chain.append(last['id'])
-        result.append({'events':chain,'voice':e['voice'],'pitches':e['pitches'],'start':str(e['absolute']),'end':str(last['absolute']+last['duration'])})
+        result.append({'events':chain,'voice':e['voice'],'pitches':e['pitches'],'start':e['absolute'],'end':last['absolute']+last['duration']})
     return result,diagnostics
+
+def spans(events):
+    result,diagnostics=chains(events)
+    return ([{'events':c['events'],'voice':c['voice'],'pitches':c['pitches'],'start':str(c['start']),'end':str(c['end'])} for c in result],diagnostics)
