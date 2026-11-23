@@ -96,6 +96,42 @@ reconciler = Reconciler.from_json(reconciler.to_json())  # 调用方保存/恢�
   判定回传。字段、沿用条件、错误类型与检查点格式见
   [起音标注对账契约](docs/reconcile.md)。
 
+## 排练终端断点续送：奏谱指令帧与恢复
+
+`score_spans.terminal` 在旧入口之外提供本地数据接口，把谱面编译成外接
+琴键提示终端只认的"输出通道、音高、开关"指令，并按终端回执断点续送；
+只做结构化数据，不驱动硬件、不接网络、不做播放器或 CLI：
+
+```python
+from score_spans.terminal import open_transfer, TerminalDelivery
+
+delivery = open_transfer('transfer-7', 0, score, {'v1': 1, 'v2': 1}, 2)
+packet = delivery.next_packet()                 # 保存检查点后才发送
+delivery.receive_receipt(packet['transfer_id'],
+                         packet['terminal_code'],
+                         packet['packet_index'])
+delivery.record_reset(1)                        # 终端复位到更大代号
+delivery.confirmed_position()                   # 最后确认的整帧位置
+delivery = TerminalDelivery.from_json(delivery.to_json())
+```
+
+* 发音链按半开区间占用物理键 `(通道, 移调后音高)`：首次占用开、最后
+  占用结束关，旧占用同刻全部结束而新占用开始时即使同键也先关后开；
+  同刻关操作全部先于开操作，两组各按通道、音高升序，无操作时刻无帧，
+  时间为规范精确分数字符串。合法延音链中间不重触发。
+* 非空帧按每包至多 K（1..64）个操作分包，前面的包装满；包带传送标识、
+  终端代号、代号内从 1 开始的包序号、帧类别（奏谱/恢复）、谱面时间、
+  片号、总片数与操作。非末片回执只表示暂存，末片回执才整帧生效。
+* 调用方串行：保存最新 JSON 检查点后才发包，回执先应用到检查点再取下
+  一包；未确认前反复取包（含重载后）得到同一个完整包。检查点不累计
+  已送包、过去代号或历次检查点。
+* 终端复位到更大代号时保留最后确认的**整帧**位置，丢弃未确认分片；
+  新代号先用恢复帧重开该位置应亮的键（每键一次、可分片、不推进位置），
+  无键则跳过恢复；恢复途中再复位仍从同一位置重来，旧代号回执无效。
+
+包协议、检查点保存/重载时机、恢复屏障与错误类型见
+[排练终端断点续送契约](docs/terminal.md)。
+
 ## 运行测试
 
 在本仓根目录（已安装本包或设置 `PYTHONPATH=src`）：
@@ -104,7 +140,7 @@ reconciler = Reconciler.from_json(reconciler.to_json())  # 调用方保存/恢�
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-测试包含旧接口回归、窗口链裁剪、段/轮次/跨段边界、覆盖审核与 `invalid_tie` 的 ordinal、非法参数拒绝，以及 10^9 次反复的冷启动计时用例；`tests/test_corpus.py` 另覆盖语料发布的桥接隔离、历史锚点、历史版本读取、等效指纹与区分边界、进程中断恢复、同版本并发写入、不合规批次整批拒绝与错误类别区分；`tests/test_reconcile.py` 覆盖起音对账的拆分/改名沿用、缺来源作废、竞争关联不挑选、改内容与恢复后的票号规则、多轮撤销重发的检查点边界、非法混合修订与过期号/无效回传/空谱/多对一改写的原子拒绝。
+测试包含旧接口回归、窗口链裁剪、段/轮次/跨段边界、覆盖审核与 `invalid_tie` 的 ordinal、非法参数拒绝，以及 10^9 次反复的冷启动计时用例；`tests/test_corpus.py` 另覆盖语料发布的桥接隔离、历史锚点、历史版本读取、等效指纹与区分边界、进程中断恢复、同版本并发写入、不合规批次整批拒绝与错误类别区分；`tests/test_reconcile.py` 覆盖起音对账的拆分/改名沿用、缺来源作废、竞争关联不挑选、改内容与恢复后的票号规则、多轮撤销重发的检查点边界、非法混合修订与过期号/无效回传/空谱/多对一改写的原子拒绝；`tests/test_terminal.py` 覆盖终端指令帧的先关后开与排序、延音链不重触发、K 分包、末片回执丢失与复位恢复屏障、恢复分片与途中再复位、回执拒收矩阵、空谱与非法输入、检查点损坏检测及本地接收端替身的端到端亮键核对。
 
 演示标准输出摘要：
 
