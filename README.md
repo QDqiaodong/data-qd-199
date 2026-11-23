@@ -66,6 +66,36 @@ old = read_corpus(store, 1)       # 按编号原样读回历史版本
 入库规则、关系证据与锚点、返回字段、重试顺序、错误类型、崩溃语义见
 [语料发布契约](docs/corpus.md)。
 
+## 起音标注对账：跨谱面修订的工作单
+
+`score_spans.reconcile` 在旧入口之外提供本地对账接口，把校订方的谱面
+修订与标注方先前领取的人工起音工作单对齐，产出当前待标注工作单和可供
+下游直接使用的已确认标注行：
+
+```python
+from score_spans.reconcile import open_batch, Reconciler
+
+reconciler = open_batch('batch-7', initial_score)
+reconciler.apply_revision(1, revised_score, [['old_note', 'new_note']])
+reconciler.submit('batch-7', ticket, 'accent')
+delivery = reconciler.delivery()           # revision + pending + confirmed
+reconciler = Reconciler.from_json(reconciler.to_json())  # 调用方保存/恢复
+```
+
+* 工作项粒度是源谱顺序的发音链（合法延音合并，休止不产生工作项）；
+  复核内容为 `voice`、全曲绝对精确 `start/end`、移调后完整 `pitches`，
+  事件 ID 只用于来源追溯。新入口拒绝重叠、越界、未兑现延音的谱，留白、
+  纯休止或空事件表不妨碍开批或修订。
+* 修订带校订方来源对 `[旧 event_id, 新 event_id]`，允许一变多、多变一；
+  未声明来源的事件没有这层证据，同名也不例外。人工复核只在双向一一、
+  成员被来源对完整覆盖、复核内容完全相同时沿用；竞争关联不挑"较像的
+  一条"，不满足即作废旧票、为新链发新票。
+* 回传只认批号匹配且当前仍待回传的本批票；同票重传、跨批、已作废票
+  拒绝，批内用过的票号永不再分配。检查点只保存当前谱、当前链与固定
+  数量的递增计数，不保存历次谱、关系或已销票明细，只凭最新 JSON 即可
+  判定回传。字段、沿用条件、错误类型与检查点格式见
+  [起音标注对账契约](docs/reconcile.md)。
+
 ## 运行测试
 
 在本仓根目录（已安装本包或设置 `PYTHONPATH=src`）：
@@ -74,7 +104,7 @@ old = read_corpus(store, 1)       # 按编号原样读回历史版本
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-测试包含旧接口回归、窗口链裁剪、段/轮次/跨段边界、覆盖审核与 `invalid_tie` 的 ordinal、非法参数拒绝，以及 10^9 次反复的冷启动计时用例；`tests/test_corpus.py` 另覆盖语料发布的桥接隔离、历史锚点、历史版本读取、等效指纹与区分边界、进程中断恢复、同版本并发写入、不合规批次整批拒绝与错误类别区分。
+测试包含旧接口回归、窗口链裁剪、段/轮次/跨段边界、覆盖审核与 `invalid_tie` 的 ordinal、非法参数拒绝，以及 10^9 次反复的冷启动计时用例；`tests/test_corpus.py` 另覆盖语料发布的桥接隔离、历史锚点、历史版本读取、等效指纹与区分边界、进程中断恢复、同版本并发写入、不合规批次整批拒绝与错误类别区分；`tests/test_reconcile.py` 覆盖起音对账的拆分/改名沿用、缺来源作废、竞争关联不挑选、改内容与恢复后的票号规则、多轮撤销重发的检查点边界、非法混合修订与过期号/无效回传/空谱/多对一改写的原子拒绝。
 
 演示标准输出摘要：
 
