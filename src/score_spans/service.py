@@ -1,5 +1,6 @@
 from .model import parse
 from .audit import audit_measures,spans
+from .window import process_window
 
 def process(data):
     measures,events=parse(data);sounding,ties=spans(events);diagnostics=audit_measures(measures,events)+ties
